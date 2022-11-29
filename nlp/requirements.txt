@@ -1,0 +1,6 @@
+fasttext
+spacy
+tqdm
+unidecode
+pyspellchecker
+gcld3
