@@ -1,6 +1,7 @@
+pandas
 fasttext
 spacy
 tqdm
 unidecode
 pyspellchecker
-gcld3
+pycld3

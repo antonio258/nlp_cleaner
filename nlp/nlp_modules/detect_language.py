@@ -1,7 +1,8 @@
 # import torch
-import gcld3
+import cld3
 import fasttext
 import numpy as np
+
 
 class fasttextLanguage:
     def __init__(self, pretrained_path):
@@ -16,8 +17,7 @@ class fasttextLanguage:
 
 class googleLanguage:
     def __init__(self):
-        self.gdetector = gcld3.NNetLanguageIdentifier(min_num_bytes=0, max_num_bytes=10000)
+        pass
     
     def predict_lang(self, text):
-        text = text if type(text) == str else ''
-        return self.gdetector.FindLanguage(text).language
+        return cld3.get_language(text)[0]

@@ -1,17 +1,27 @@
-import enum
 import spacy
 import re
 import os
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from typing import Union
 from unidecode import unidecode
 from spellchecker import SpellChecker
 
 
 class PreProcessing:
-    def __init__(self, noadverbs=False, noadjectives=False, noverbs=False, noentities=True, language='en', remove_list=False):
-        
+    def __init__(self, noadverbs: bool = False, noadjectives: bool = False, noverbs: bool = False,
+                 noentities: bool = False, language: str = 'en', remove_list: bool = False):
+        """
+        Classe de pré-processamento de bases textuais
+        Args:
+            noadverbs (bool): Se verdadeiro os advérbios serão removidos no spacy.
+            noadjectives (bool):  Se verdadeiro os adjetivos serão removidos no spacy.
+            noverbs (bool):  Se verdadeiro os verbos serão removidos no spacy.
+            noentities (bool):  Se verdadeiro as entidades serão removidas no spacy.
+            language (str): Idioma utilizado, definiará as stopwords e a correção automatica de números.
+            remove_list:
+        """
         if language == 'en':
             try:
                 self.nlp = spacy.load('en_core_web_sm')
@@ -24,82 +34,153 @@ class PreProcessing:
             except OSError:
                 os.system('python -m spacy download pt_core_news_sm')
                 self.nlp = spacy.load('pt_core_news_sm')
+        elif language == 'es':
+            try:
+                self.nlp = spacy.load('pt_core_news_sm')
+            except OSError:
+                os.system('python -m spacy download es_core_news_sm')
+                self.nlp = spacy.load('es_core_news_sm')
 
         self.noadverbs = noadverbs
         self.noadjectives = noadjectives
         self.noverbs = noverbs
         self.noentities = noentities
         self.remove_list = remove_list
-        self.stopwords = []
+        self.stopwords = [unidecode(x).lower() for x in list(self.nlp.Defaults.stop_words)]
 
     @staticmethod
-    def lowercase_unidecode(text):
+    def lowercase_unidecode(text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Aplica normalização nos dados, os caracteres serão converidos em minúsculos e a acentuação será removida.
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
         if type(text) == str:
             return unidecode(text.lower())
-        elif type(text) == list:
+        elif type(text) == list or type(text) == pd.Series or type(text) == np.array:
             return [unidecode(str(x).lower()) for x in text]
         return ''
 
     @staticmethod
-    def remove_tweet_marking(text):
-        if type(text) == str:
-            return re.sub('(@|#)\S+', '', text)
-        elif type(text) == list:
-            return [re.sub('(@|#)\S+', '', str(x)) for x in text]
-        return ''
+    def remove_urls(text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Aplica a remoção de urls
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
 
-    @staticmethod
-    def remove_punctuation(text):
-        punctuation = """(!|"|#|\$|%|&|'|\(|\)|\*|\+|,|-|\.|\/|:|;|<|=|>|\?|\@|\[|\]|\^|_|`|\{|\|\}|~|\|)"""
-        if type(text) == str:
-            text = re.sub(punctuation, ' ',text)
-            text = re.sub(' {2,}', ' ', text)
-            return text
-        elif type(text) == list:
-            text = [re.sub(punctuation, ' ',str(x)) for x in text]
-            return [re.sub(' {2,}', ' ', x) for x in text]
-        return ''
-
-    @staticmethod
-    def remove_urls(text):
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
         if type(text) == str:
             text = re.sub(r'http\S+', '', text)
             return text
-        elif type(text) == list:
+        elif type(text) == list or type(text) == pd.Series or type(text) == np.array:
             return [re.sub(r'http\S+', '', x) for x in text]
         return ''
 
     @staticmethod
-    def remove_repetion(text):
+    def remove_tweet_marking(text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Aplica a remoção de marcações do twitter '@'
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
+        if type(text) == str:
+            return re.sub('(@|#)\S+', '', text)
+        elif type(text) == list or type(text) == pd.Series or type(text) == np.array:
+            return [re.sub('(@|#)\S+', '', str(x)) for x in text]
+        return ''
+
+    @staticmethod
+    def remove_punctuation(text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Aplica a remoção de pontuação
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
+        punctuation = """(!|"|#|\$|%|&|'|\(|\)|\*|\+|,|-|\.|\/|:|;|<|=|>|\?|\@|\[|\]|\^|_|`|\{|\}|~|\||\r\n|\n|\r|\\\)"""
+        if type(text) == str:
+            text = re.sub(punctuation, ' ', text)
+            text = re.sub(' {2,}', ' ', text)
+            return text
+        elif type(text) == list or type(text) == pd.Series or type(text) == np.array:
+            text = [re.sub(punctuation, ' ', str(x)) for x in text]
+            return [re.sub(' {2,}', ' ', x) for x in text]
+        return ''
+
+    @staticmethod
+    def remove_repetion(text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Aplica remoção de repetição de caracteres consecutivos
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
         if type(text) == str:
             return re.sub(r'([a-z])\1{2}', '', text)
-        elif type(text) == list or type(text) == np.array or type(text) == pd.Series:
+        elif type(text) == list or type(text) == np.array or type(text) == pd.Series or type(text) == np.array:
             return [re.sub(r'([a-z])\1{2}', '', str(x)) for x in text]
         return ''
 
-    def remove_stopwords(self, text, method='extended'):
-        if method == 'extended':
-            stopwords = [unidecode(x).lower() for x in list(self.nlp.Defaults.stop_words)]
-            if self.remove_list:
-                stopwords.extend(self.remove_list)
-        elif method == 'replace':
-            stopwords = self.remove_list
+    def append_stopwords_list(self, stopwords: list) -> None:
+        """
+        Adiciona stopwords a lista de stopwords
+        Args:
+            stopwords (list): lista de stopwords a serem inseridas
 
-        #     self.stopwords += stopwords
-        if type(text) == list:
-            if type(text[0]) == list:
-                for i, j in enumerate(text):
-                    text[i] = [x for x in j if x not in stopwords]
-                return text
-            else:
-                return [x for x in text if x not in stopwords]
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
+        self.stopwords.extend(stopwords)
+
+    def remove_stopwords(self, text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Remove as stopwords de uma string ou lista de tokens
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
+        if type(text) == str:
+            text = text.split(' ')
+
+            return ' '.join(
+                [x for x in text if x not in self.stopwords]
+            )
+        elif type(text) == list or type(text) == pd.Series or type(text) == np.array:
+            docs = list(map(lambda doc: doc.split(' ') if type(doc) == str else doc, text))
+            return list(
+                map(
+                    lambda doc: ' '.join([x for x in doc if x not in self.stopwords]), docs)
+            )
         return ''
 
+    def spacy_processing(self, docs: list, n_process: int = -1, lemma: str = False) -> list:
+        """
+        Aplica processamento do spacy, possível remoção de classes gramaticais definidas no init, bem como remoção
+        de entidades
+        Args:
+            docs (list): lista de documentos
+            n_process (int): número de threads para execução em paralelo
+            lemma (bool): se verdadeiro, será feito uma lemmatização dos tokens
 
-    def spacy_processing(self, docs, n_process=-1, lemma=False):
+        Returns:
+            pp_docs (list): retorna lista de documentos limpos
+        """
         all_docs = self.nlp.pipe(docs, n_process=n_process)
         pp_docs = []
-        language_docs = []
         for doc in tqdm(all_docs):
             pp_doc = [token for token in doc if token.is_ascii]  # remove no ascii
             if self.noadverbs:
@@ -108,20 +189,10 @@ class PreProcessing:
                 pp_doc = [token for token in pp_doc if token.pos_ != 'ADJ']  # remove adjectives
             if self.noverbs:
                 pp_doc = [token for token in pp_doc if token.pos_ != 'VERB']  # remove verbs
-            pp_doc = [token for token in pp_doc if not token.is_digit]  # remove digits
-            pp_doc = [token for token in pp_doc if not token.is_punct]  # remove punct
             pp_doc = [token for token in pp_doc if not token.is_space]  # remove whitespace
-            # pp_doc = [token for token in pp_doc if not token.is_stop]  # remove stopwords
-            pp_doc = [token for token in pp_doc if not token.like_num]  # remove numerals
-            # pp_doc = [token for token in pp_doc if not token.like_url]  # remove urls
-            # pp_doc = [token for token in pp_doc if not token.like_email]  # remove emails
 
             # Remove Entities
-            if self.remove_list and self.noentities:
-                for token in pp_doc:
-                    if token.ent_type_ in ['MONEY', 'DATE', 'PERSON', 'PERCENT', 'ORDINAL', 'CARDINAL', 'QUANTITY', 'GPE', 'NORP', 'LANGUAGE']:
-                        self.stopwords.append(token.lower_)
-            elif self.noentities:
+            if self.noentities:
                 pp_doc = [token for token in pp_doc if token.ent_type_ != 'MONEY']
                 pp_doc = [token for token in pp_doc if token.ent_type_ != 'DATE']
                 pp_doc = [token for token in pp_doc if token.ent_type_ != 'PERSON']
@@ -132,87 +203,101 @@ class PreProcessing:
                 pp_doc = [token for token in pp_doc if token.ent_type_ != 'GPE']
                 pp_doc = [token for token in pp_doc if token.ent_type_ != 'NORP']
                 pp_doc = [token for token in pp_doc if token.ent_type_ != 'LANGUAGE']
-            pp_doc = [self.remove_infinitive(token.lemma_).lower() if token.pos_ == "VERB" else
-                      token.lemma_.lower() if lemma else token.lower_ for token in pp_doc]
-            pp_docs.append(pp_doc)
 
+            pp_doc = [self.remove_infinitive(token.lemma_).lower() if token.pos_ == 'VERB' else
+                      token.lemma_.lower() if lemma else token.lower_ for token in pp_doc]
+            pp_docs.append(' '.join(pp_doc))
         return pp_docs
 
-    def remove_n(self, text, n):
+    def remove_n(self, text: Union[str, list, np.array, pd.Series], n: int) -> Union[str, list]:
+        """
+        Remove tokens com tamanho menor que n
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+            n (int): número mínimo de caracteres
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
+        string = False
         if type(text) == str:
-            if len(text) < n:
-                if self.remove_list:
-                    self.stopwords.append(text)
-                else:
-                    return None
-        elif type(text) == list or type(text) == np.array or type(text) == pd.Series:
-            if type(text[0]) == list:
-                for i, j in enumerate(text):
-                    if self.remove_list:
-                        self.stopwords += [x for x in j if len(x) < n]
-                    else:
-                        text[i] = [x for x in j if len(x) >= n]
-                return text
-            else:
-                if self.remove_list:
-                    self.stopwords += [x for x in text if len(x) < n]
-                else:
-                    return [x for x in text if len(x) >= n]
+            text = text.split(' ')
+            string = True
+        if type(text) == list or type(text) == pd.Series or type(text) == np.array:
+            text = list(map(
+                lambda doc: ' '.join([word for word in doc.split(' ') if len(word.strip()) >= n]),
+                text
+            ))
+            text = [doc for doc in text if doc]
+            if string:
+                return ' '.join(text)
+            return text
         return ''
 
     @staticmethod
-    def remove_numbers(text, mode='filter', language='pt'):
+    def remove_numbers(text: Union[str, list, np.array, pd.Series], mode: str = 'filter',
+                       language: str = 'pt') -> Union[str, list]:
+        """
+        Remoção ou correção de tokens com números,
+        se mode == 'filter' tokens com números serão removidos
+        se mode == 'spell' será feita uma correção automática dos tokens que possuem números
+        se mode == 'replace' apenas os números do token será removido. Ex: t3ste = tste
+        Args:
+            text (str|list): string ou lista de strings a ser limpa
+            mode (str): método de ajuste para palavras com números
+            language (str): idioma para correção automatica se mode == 'spell'
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
+        mode_function = {
+            'filter': lambda x: '' if re.search('[0-9]', x) else x,
+            'spell': lambda x: spell.correction(x) if re.search('[0-9]', x) else x,
+            'replace': lambda x: re.sub('[0-9]', '', x)
+        }
         spell = SpellChecker(language=language)
+        string = False
         if type(text) == str:
-            if mode == 'filter':
-                if re.search("[0-9]", text):
-                    return None
-            elif mode == 'spell':
-                if re.search("[0-9]", text):
-                    return spell.correction(text)
-            elif mode == 'replace':
-                return re.sub("[0-9]", "", text)
-        elif type(text) == list or type(text) == np.array or type(text) == pd.Series:
-            if type(text[0]) == list:
-                for i, j in enumerate(text):
-                    if mode == 'filter':
-                        text[i] = [x for x in j if not re.search("[0-9]", x) if x]
-                    elif mode == 'spell':
-                        text[i] = [x if not re.search("[0-9]", x) else spell.correction(x) for x in j if x]
-                    elif mode == 'replace':
-                        text[i] = [re.sub("[0-9]", "", x) for x in j if x]
-                return text
-            else:
-                if mode == 'filter':
-                    return [x for x in text if not re.search("[0-9]", x)]
-                elif mode == 'spell':
-                    return [x if not re.search("[0-9]", x) else spell.correction(x) for x in text if x]
-                elif mode == 'replace':
-                        return [re.sub("[0-9]", "", x) for x in text if x]
-        return text
-
-    @staticmethod
-    def remove_gerund(text):
-        if type(text) == str:
-            return re.sub(r"ndo$", "", text)
-        elif type(text) == list or type(text) == np.array or type(text) == pd.Series:
-            if type(text[0]) == list:
-                for i, j in enumerate(text):
-                    text[i] = [re.sub(r"ndo$", "", x) for x in j if x]
-            else:
-                text = [re.sub(r"ndo$", "", x) for x in text if x]
+            text = text.split(' ')
+            string = True
+        if type(text) == list or type(text) == pd.Series or type(text) == np.array:
+            text = list(map(
+                lambda doc: ' '.join([mode_function[mode](word) for word in doc.split(' ')]),
+                text
+            ))
+            text = [doc for doc in text if doc]
+            if string:
+                return ' '.join(text)
             return text
         return ''
 
     @staticmethod
-    def remove_infinitive(text):
+    def remove_gerund(text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Remove as terminações ndo (gerúndio em português)
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
         if type(text) == str:
-            return re.sub(r"r$", "", text)
+            return re.sub(r'ndo$', '', text)
         elif type(text) == list or type(text) == np.array or type(text) == pd.Series:
-            if type(text[0]) == list:
-                for i, j in enumerate(text):
-                    text[i] = [re.sub(r"r$", "", x) for x in j if x]
-            else:
-                text = [re.sub(r"r$", "", x) for x in text if x]
-            return text
+            return [re.sub(r'ndo$', '', x) for x in text if x]
+        return ''
+
+    @staticmethod
+    def remove_infinitive(text: Union[str, list, np.array, pd.Series]) -> Union[str, list]:
+        """
+        Remove o caractere 'r' do final de palavras, geralmente este indica verbos no infinitivo
+        Args:
+            text(str|list): string ou lista de strings a ser limpa
+
+        Returns:
+            text(str|list): string ou lista de strings limpa
+        """
+        if type(text) == str:
+            return re.sub(r'r$', '', text)
+        elif type(text) == list or type(text) == np.array or type(text) == pd.Series:
+            return [re.sub(r'r$', '', x) for x in text if x]
         return ''
